@@ -1,0 +1,16 @@
+{
+	"Name": "Takyon.TopSpeed",
+	"Description": "Shows the top speeds of the fastest players at the end of the match",
+	"LoadPriority": 1,
+	"RequiredOnClient": false,
+	"Version": "0.0.1",
+	"Scripts": [
+		{
+			"Path": "takyon_topspeed.nut",
+			"RunOn": "SERVER",
+			"ServerCallback": {
+				"After": "takyon_topspeedInit"
+			}
+		}
+	]
+}
