@@ -4,12 +4,18 @@
 	"LoadPriority": 1,
 	"RequiredOnClient": false,
 	"Version": "0.0.1",
+	"ConVars": [
+		{
+			"Name": "ts_rank_amount",
+			"DefaultValue": "3" // of how many players the top speed will be displayed
+		}
+	],
 	"Scripts": [
 		{
 			"Path": "takyon_topspeed.nut",
 			"RunOn": "SERVER",
 			"ServerCallback": {
-				"After": "takyon_topspeedInit"
+				"After": "TopSpeedInit"
 			}
 		}
 	]
