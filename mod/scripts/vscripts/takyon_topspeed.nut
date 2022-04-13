@@ -10,11 +10,11 @@ string path = "../R2Northstar/mods/Takyon.TopSpeed/mod/scripts/vscripts/takyon_t
 array<TS_PlayerData> ts_playerData = [] // data from current match
 
 void function TopSpeedInit(){
+	AddCallback_OnReceivedSayTextMessage(TS_ChatCallback)
+
 	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
     AddCallback_OnClientDisconnected(TS_OnPlayerDisconnected)
 	AddCallback_GameStateEnter(eGameState.Postmatch, TS_Postmatch)
-
-	AddClientCommandCallback("!top", TS_LeaderBoard)
 
 	thread TopSpeedMain()
 }
@@ -37,14 +37,45 @@ void function TopSpeedMain(){
 	}
 }
 
-bool function TS_LeaderBoard(entity player, array<string> args){
-	TS_CfgInit()
-	// TODO sort cfg
-	Chat_ServerPrivateMessage(player, "[TopSpeed] Leaderboard", false)
-	foreach(TS_PlayerData pd in ts_cfg_players){
-		Chat_ServerPrivateMessage(player, pd.name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(pd.speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(pd.speed)) + "mph", false)
+void function TS_LeaderBoard(entity player){
+	TS_CfgInit() // load config
+
+	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players.sort(TopSpeedSort) // sort config in new array to not fuck with other shit
+	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed][TopSpeed] \x1b[38;2;0;220;30mAll-Time Leaderboard", false)
+
+	for(int i = 0; i < GetConVarInt("ts_cfg_leaderboard_amount"); i++){
+		Chat_ServerPrivateMessage(player, ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(ts_sortedConfig[i].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(ts_sortedConfig[i].speed)) + "mph", false)
 	}
-	return true
+}
+
+/*
+ *	CHAT COMMANDS
+ */
+
+ClServer_MessageStruct function ChatCallback(ClServer_MessageStruct message) {
+    string msg = message.message.tolower()
+    // find first char -> gotta be ! to recognize command
+    if (format("%c", msg[0]) == "!") {
+        // command
+        msg = msg.slice(1) // remove !
+        array<string> msgArr = split(msg, " ") // split at space, [0] = command
+        string cmd
+        
+        try{
+            cmd = msgArr[0] // save command
+        }
+        catch(e){
+            return message
+        }
+
+        msgArr.remove(0) // remove command from args
+
+        // command logic
+		if(cmd == "topspeed"){
+			TS_LeaderBoard(message.player)
+		}
+    }
+    return message
 }
 
 /*
@@ -104,6 +135,13 @@ bool function ShouldSavePlayerInConfig(TS_PlayerData pd){
 		}
 	}
 	return true // player not yet in config
+}
+
+int function TopSpeedSort(TS_PlayerData data1, TS_PlayerData data2)
+{
+  if ( data1.speed == data2.speed )
+    return 0
+  return data1.speed < data2.speed ? 1 : -1
 }
 
 float function GetPlayerSpeed(entity player){
