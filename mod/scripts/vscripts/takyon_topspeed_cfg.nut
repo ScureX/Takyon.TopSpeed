@@ -3,7 +3,6 @@ global array<TS_PlayerData> ts_cfg_players = []
 
 void function TS_CfgInit(){
 ts_cfg_players.clear()
-AddPlayer("Takyon_Scure", "1006880507304", 0.000000)
 }
 
 void function AddPlayer(string name, string uid, float speed){

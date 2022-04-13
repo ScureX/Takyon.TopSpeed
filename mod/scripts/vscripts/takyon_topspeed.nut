@@ -7,7 +7,7 @@ global struct TS_PlayerData{
 }
 
 string path = "../R2Northstar/mods/Takyon.TopSpeed/mod/scripts/vscripts/takyon_topspeed_cfg.nut" // where the config is stored
-array<TS_PlayerData> ts_playerData = []
+array<TS_PlayerData> ts_playerData = [] // data from current match
 
 void function TopSpeedInit(){
 	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
@@ -40,9 +40,9 @@ void function TopSpeedMain(){
 bool function TS_LeaderBoard(entity player, array<string> args){
 	TS_CfgInit()
 	// TODO sort cfg
-	Chat_ServerBroadcast("[TopSpeed] Leaderboard")
+	Chat_ServerPrivateMessage(player, "[TopSpeed] Leaderboard", false)
 	foreach(TS_PlayerData pd in ts_cfg_players){
-		Chat_ServerBroadcast(pd.name + ": " + pd.speed.tostring())
+		Chat_ServerPrivateMessage(player, pd.name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(pd.speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(pd.speed)) + "mph", false)
 	}
 	return true
 }
@@ -65,9 +65,20 @@ void function TS_SaveConfig(){
 	DevTextBufferClear()
 	DevTextBufferWrite(TS_HEADER)
 
-	foreach(TS_PlayerData pd in ts_playerData){
-		// TODO logic for comparing, only save new vals if higher or not existent
-		DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
+	// logic for comparing, only save new vals if higher or not existent
+	foreach(TS_PlayerData pd in ts_playerData){ // loop through each player in current match
+		if(ShouldSavePlayerInConfig(pd)){
+			DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
+		}
+		else {
+			foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through config
+				if(pdcfg.uid == pd.uid){ // find players config
+					DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pdcfg.name, pdcfg.uid, pdcfg.speed))
+					break
+				}
+			}
+		}
+		
 	}
 
     DevTextBufferWrite(TS_FOOTER)
@@ -75,11 +86,25 @@ void function TS_SaveConfig(){
     DevP4Checkout(path)
 	DevTextBufferDumpToFile(path)
 	DevP4Add(path)
+	
+	Chat_ServerBroadcast("[TopSpeed] Speeds have been saved and will be updated on map-reload")
 }
 
 /*
  *	HELPER FUNCTIONS
  */
+
+// true if not in cfg or has higher speed, flase if lower speed
+bool function ShouldSavePlayerInConfig(TS_PlayerData pd){ 
+	foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through config
+		if(pdcfg.uid == pd.uid){ // find players config
+			if(pdcfg.speed >= pd.speed) 
+				return false // was slower this match
+			return true // was faster this match
+		}
+	}
+	return true // player not yet in config
+}
 
 float function GetPlayerSpeed(entity player){
 	vector playerVelV = player.GetVelocity()
@@ -103,7 +128,7 @@ void function TS_Postmatch(){
 	if(tempPD.len() < GetConVarInt("ts_rank_amount")) rankAmount = tempPD.len()
 	else rankAmount = GetConVarInt("ts_rank_amount")
 
-	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mLeaderboard")
+	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mMatch-Leaderboard")
 	for(int i = 0; i < rankAmount; i++){
 		switch(i){
 			case 0:
@@ -121,7 +146,7 @@ void function TS_Postmatch(){
 		}
 	}
 
-	Chat_ServerBroadcast("\n")
+	Chat_ServerBroadcast("")
 	print("[TS] Leaderboard sent")
 	TS_SaveConfig()
 }
