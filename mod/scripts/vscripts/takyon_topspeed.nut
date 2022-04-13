@@ -40,11 +40,14 @@ void function TopSpeedMain(){
 void function TS_LeaderBoard(entity player){
 	TS_CfgInit() // load config
 
-	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players.sort(TopSpeedSort) // sort config in new array to not fuck with other shit
-	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed][TopSpeed] \x1b[38;2;0;220;30mAll-Time Leaderboard", false)
+	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players // sort config in new array to not fuck with other shit
+	ts_sortedConfig.sort(TopSpeedSort)
+	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mAll-Time Leaderboard", false)
 
-	for(int i = 0; i < GetConVarInt("ts_cfg_leaderboard_amount"); i++){
-		Chat_ServerPrivateMessage(player, ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(ts_sortedConfig[i].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(ts_sortedConfig[i].speed)) + "mph", false)
+	int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount") > ts_sortedConfig.len() ? ts_sortedConfig.len() : GetConVarInt("ts_cfg_leaderboard_amount")
+
+	for(int i = 0; i < loopAmount; i++){
+		Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(ts_sortedConfig[i].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(ts_sortedConfig[i].speed)) + "mph", false)
 	}
 }
 
@@ -52,7 +55,7 @@ void function TS_LeaderBoard(entity player){
  *	CHAT COMMANDS
  */
 
-ClServer_MessageStruct function ChatCallback(ClServer_MessageStruct message) {
+ClServer_MessageStruct function TS_ChatCallback(ClServer_MessageStruct message) {
     string msg = message.message.tolower()
     // find first char -> gotta be ! to recognize command
     if (format("%c", msg[0]) == "!") {
@@ -68,10 +71,8 @@ ClServer_MessageStruct function ChatCallback(ClServer_MessageStruct message) {
             return message
         }
 
-        msgArr.remove(0) // remove command from args
-
         // command logic
-		if(cmd == "topspeed"){
+		if(cmd == "topspeed" || cmd == "ts"){
 			TS_LeaderBoard(message.player)
 		}
     }
