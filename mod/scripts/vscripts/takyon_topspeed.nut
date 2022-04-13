@@ -119,7 +119,7 @@ void function TS_SaveConfig(){
 	DevTextBufferDumpToFile(path)
 	DevP4Add(path)
 	
-	Chat_ServerBroadcast("[TopSpeed] Speeds have been saved and will be updated on map-reload")
+	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;75;245;66mSpeeds have been saved and will be updated on map-reload")
 }
 
 /*
