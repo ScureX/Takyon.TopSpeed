@@ -17,6 +17,10 @@
 			"ServerCallback": {
 				"After": "TopSpeedInit"
 			}
+		},
+		{
+			"Path": "takyon_topspeed_cfg.nut",
+			"RunOn": "SERVER"
 		}
 	]
 }

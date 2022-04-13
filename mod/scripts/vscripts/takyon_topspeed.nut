@@ -1,16 +1,20 @@
 global function TopSpeedInit
 
-struct TS_PlayerData{
+global struct TS_PlayerData{
 	string name 
+	string uid
 	float speed = 0
 }
 
+string path = "../R2Northstar/mods/Takyon.TopSpeed/mod/scripts/vscripts/takyon_topspeed_cfg.nut" // where the config is stored
 array<TS_PlayerData> ts_playerData = []
 
 void function TopSpeedInit(){
 	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
     AddCallback_OnClientDisconnected(TS_OnPlayerDisconnected)
 	AddCallback_GameStateEnter(eGameState.Postmatch, TS_Postmatch)
+
+	AddClientCommandCallback("!top", TS_LeaderBoard)
 
 	thread TopSpeedMain()
 }
@@ -31,6 +35,46 @@ void function TopSpeedMain(){
 			}
 		}
 	}
+}
+
+bool function TS_LeaderBoard(entity player, array<string> args){
+	TS_CfgInit()
+	// TODO sort cfg
+	Chat_ServerBroadcast("[TopSpeed] Leaderboard")
+	foreach(TS_PlayerData pd in ts_cfg_players){
+		Chat_ServerBroadcast(pd.name + ": " + pd.speed.tostring())
+	}
+	return true
+}
+
+/*
+ *	CONFIG
+ */
+
+const string TS_HEADER = "global function TS_CfgInit\n" +
+						 "global array<TS_PlayerData> ts_cfg_players = []\n\n" +
+						 "void function TS_CfgInit(){\n" +
+						 "ts_cfg_players.clear()\n"
+
+const string TS_FOOTER = "}\n\n" +
+						 "void function AddPlayer(string name, string uid, float speed){\n" +
+						 "TS_PlayerData tmp\ntmp.name = name\ntmp.uid = uid\ntmp.speed = speed\nts_cfg_players.append(tmp)\n" +
+						 "}"
+
+void function TS_SaveConfig(){
+	DevTextBufferClear()
+	DevTextBufferWrite(TS_HEADER)
+
+	foreach(TS_PlayerData pd in ts_playerData){
+		// TODO logic for comparing, only save new vals if higher or not existent
+		DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
+	}
+
+    DevTextBufferWrite(TS_FOOTER)
+
+    DevP4Checkout(path)
+	DevTextBufferDumpToFile(path)
+	DevP4Add(path)
 }
 
 /*
@@ -79,6 +123,7 @@ void function TS_Postmatch(){
 
 	Chat_ServerBroadcast("\n")
 	print("[TS] Leaderboard sent")
+	TS_SaveConfig()
 }
 
 int function SpeedSort(TS_PlayerData data1, TS_PlayerData data2)
@@ -101,6 +146,7 @@ void function TS_OnPlayerSpawned(entity player){
 	if(!found){
 		TS_PlayerData tmp
 		tmp.name = player.GetPlayerName()
+		tmp.uid = player.GetUID()
 		ts_playerData.append(tmp)
 	}
 }
