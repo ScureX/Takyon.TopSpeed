@@ -94,23 +94,50 @@ const string TS_FOOTER = "}\n\n" +
 						 "}"
 
 void function TS_SaveConfig(){
+	TS_CfgInit()
+
+	array<TS_PlayerData> livePlayersToSave = []
+	array<TS_PlayerData> offlinePlayersToSave = []
+
+	foreach(TS_PlayerData pd in ts_playerData){ // loop through each player in current match, save all players with higher times or not in cfg
+		bool found = false
+		foreach(TS_PlayerData pdcfg in ts_cfg_players){
+			if(pd.uid == pdcfg.uid){ // player is in cfg and faster -> should save
+				found = true
+				if(pdcfg.speed < pd.speed)
+					livePlayersToSave.append(pd)
+			}
+		}
+
+		if(!found){ // not in cfg -> save
+			livePlayersToSave.append(pd)
+		}
+	}
+
+	// loop through cfg to save players not online
+	foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through everyone in config
+		bool found = false
+		foreach(TS_PlayerData pd in livePlayersToSave){ // loop through each player that should be saved. if pdcfg cant be found there player is offline. save pdcfg
+			if(pd.uid == pdcfg.uid)
+				found = true // player is aleady in livePLayerToSave, dont save their cfg
+		}
+
+		if(!found){ // player not in livePlayersToSave -> is offline, save cfg
+			offlinePlayersToSave.append(pdcfg)
+		}
+	}
+
+	// merge live and offline players
+	array<TS_PlayerData> allPlayersToSave = []
+	allPlayersToSave.extend(livePlayersToSave)
+	allPlayersToSave.extend(offlinePlayersToSave)
+
+	// write to buffer
 	DevTextBufferClear()
 	DevTextBufferWrite(TS_HEADER)
 
-	// logic for comparing, only save new vals if higher or not existent
-	foreach(TS_PlayerData pd in ts_playerData){ // loop through each player in current match
-		if(ShouldSavePlayerInConfig(pd)){
-			DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
-		}
-		else {
-			foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through config
-				if(pdcfg.uid == pd.uid){ // find players config
-					DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pdcfg.name, pdcfg.uid, pdcfg.speed))
-					break
-				}
-			}
-		}
-		
+	foreach(TS_PlayerData pd in allPlayersToSave){
+		DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
 	}
 
     DevTextBufferWrite(TS_FOOTER)
@@ -118,25 +145,14 @@ void function TS_SaveConfig(){
     DevP4Checkout(path)
 	DevTextBufferDumpToFile(path)
 	DevP4Add(path)
-	
+
+	print("[TopSpeed] Saved config at " + path)
 	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;75;245;66mSpeeds have been saved and will be updated on map-reload")
 }
 
 /*
  *	HELPER FUNCTIONS
  */
-
-// true if not in cfg or has higher speed, false if lower speed
-bool function ShouldSavePlayerInConfig(TS_PlayerData pd){ 
-	foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through config
-		if(pdcfg.uid == pd.uid){ // find players config
-			if(pdcfg.speed >= pd.speed) 
-				return false // was slower this match
-			return true // was faster this match
-		}
-	}
-	return true // player not yet in config
-}
 
 int function TopSpeedSort(TS_PlayerData data1, TS_PlayerData data2)
 {
