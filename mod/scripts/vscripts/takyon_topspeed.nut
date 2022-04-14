@@ -126,7 +126,7 @@ void function TS_SaveConfig(){
  *	HELPER FUNCTIONS
  */
 
-// true if not in cfg or has higher speed, flase if lower speed
+// true if not in cfg or has higher speed, false if lower speed
 bool function ShouldSavePlayerInConfig(TS_PlayerData pd){ 
 	foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through config
 		if(pdcfg.uid == pd.uid){ // find players config
@@ -190,8 +190,7 @@ void function TS_Postmatch(){
 	TS_SaveConfig()
 }
 
-int function SpeedSort(TS_PlayerData data1, TS_PlayerData data2)
-{
+int function SpeedSort(TS_PlayerData data1, TS_PlayerData data2){
   if ( data1.speed == data2.speed )
     return 0
   return data1.speed < data2.speed ? 1 : -1
@@ -219,7 +218,7 @@ void function TS_OnPlayerDisconnected(entity player){
 	for(int i = 0; i < ts_playerData.len(); i++){
 		try{
 			if(player.GetPlayerName() == ts_playerData[i].name){
-				ts_playerData.remove(i)
+				//ts_playerData.remove(i)
 			}
 		} catch(e){}
 	}
