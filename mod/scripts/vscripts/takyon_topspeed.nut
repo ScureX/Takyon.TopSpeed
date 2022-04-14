@@ -42,7 +42,7 @@ void function TS_LeaderBoard(entity player){
 
 	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players // sort config in new array to not fuck with other shit
 	ts_sortedConfig.sort(TopSpeedSort)
-	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mAll-Time Leaderboard", false)
+	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mTop Leaderboard", false)
 
 	int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount") > ts_sortedConfig.len() ? ts_sortedConfig.len() : GetConVarInt("ts_cfg_leaderboard_amount")
 
