@@ -4,6 +4,7 @@ global struct TS_PlayerData{
 	string name 
 	string uid
 	float speed = 0
+	bool aboveAnnounceSpeed = false
 }
 
 string path = "../R2Northstar/mods/Takyon.TopSpeed/mod/scripts/vscripts/takyon_topspeed_cfg.nut" // where the config is stored
@@ -13,7 +14,6 @@ void function TopSpeedInit(){
 	AddCallback_OnReceivedSayTextMessage(TS_ChatCallback)
 
 	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
-    AddCallback_OnClientDisconnected(TS_OnPlayerDisconnected)
 	AddCallback_GameStateEnter(eGameState.Postmatch, TS_Postmatch)
 
 	thread TopSpeedMain()
@@ -28,10 +28,22 @@ void function TopSpeedMain(){
 				try{
 					if(player.GetPlayerName() == pd.name){
 						float speed = GetPlayerSpeed(player)
+
 						if(speed > pd.speed)
 							pd.speed = speed
+						
+						if(SpeedToKmh(sqrt(speed)) > GetConVarInt("ts_announce_min_speed") && !pd.aboveAnnounceSpeed){ // special announcement for being fast af
+							Chat_ServerBroadcast(format("\x1b[34m[TopSpeed] \x1b[38;2;220;220;20m%s is zooming! \x1b[0m(\x1b[38;2;0;220;30m%.2fkmh\x1b[0m/\x1b[38;2;0;220;30m%.2fmph\x1b[0m)", pd.name, SpeedToKmh(sqrt(speed)), SpeedToMph(sqrt(speed))))
+							pd.aboveAnnounceSpeed = true
+							foreach(entity p in GetPlayerArray()){
+								try{
+									EmitSoundOnEntity(p, "HUD_Boost_Card_Earned_1P")
+								} catch(e){} // dont care lol
+							}
+						}
+						else if (SpeedToKmh(sqrt(speed)) < GetConVarInt("ts_announce_min_speed")) pd.aboveAnnounceSpeed = false
 					}
-				} catch(e){}
+				} catch(e){print(e)}
 			}
 		}
 	}
@@ -47,7 +59,7 @@ void function TS_LeaderBoard(entity player){
 	int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount") > ts_sortedConfig.len() ? ts_sortedConfig.len() : GetConVarInt("ts_cfg_leaderboard_amount")
 
 	for(int i = 0; i < loopAmount; i++){
-		Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(ts_sortedConfig[i].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(ts_sortedConfig[i].speed)) + "mph", false)
+		Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(ts_sortedConfig[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(ts_sortedConfig[i].speed))) + "mph", false)
 	}
 }
 
@@ -147,7 +159,7 @@ void function TS_SaveConfig(){
 	DevP4Add(path)
 
 	print("[TopSpeed] Saved config at " + path)
-	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;75;245;66mSpeeds have been saved and will be updated on map-reload")
+	//Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;75;245;66mSpeeds have been saved and will be updated on map-reload")
 }
 
 /*
@@ -187,16 +199,16 @@ void function TS_Postmatch(){
 	for(int i = 0; i < rankAmount; i++){
 		switch(i){
 			case 0:
-				Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(tempPD[0].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(tempPD[0].speed)) + "mph")
+				Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[0].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[0].speed))) + "mph")
 				break
 			case 1:
-				Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(tempPD[1].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(tempPD[1].speed)) + "mph")
+				Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[1].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[1].speed))) + "mph")
 				break
 			case 2:
-				Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(tempPD[2].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(tempPD[2].speed)) + "mph")
+				Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[2].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[2].speed))) + "mph")
 				break
 			default:
-				Chat_ServerBroadcast(": \x1b[38;2;75;245;66m" + SpeedToKmh(sqrt(tempPD[i].speed)) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + SpeedToMph(sqrt(tempPD[i].speed)) + "mph")
+				Chat_ServerBroadcast(tempPD[i].name +": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[i].speed)) + "mph"))
 				break
 		}
 	}
@@ -228,14 +240,6 @@ void function TS_OnPlayerSpawned(entity player){
 		tmp.uid = player.GetUID()
 		ts_playerData.append(tmp)
 	}
-}
 
-void function TS_OnPlayerDisconnected(entity player){
-	for(int i = 0; i < ts_playerData.len(); i++){
-		try{
-			if(player.GetPlayerName() == ts_playerData[i].name){
-				//ts_playerData.remove(i)
-			}
-		} catch(e){}
-	}
+	TS_SaveConfig() // use this as periodic saving lol
 }

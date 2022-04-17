@@ -12,6 +12,10 @@
 		{
 			"Name": "ts_cfg_leaderboard_amount",
 			"DefaultValue": "8" // how many people should be displayed in the all-time leaderboard
+		},
+		{
+			"Name": "ts_announce_min_speed",
+			"DefaultValue": "50" // how fast a player has to go to get the anouncement that theyre goin fast. set this HIGH but not unreachable
 		}
 	],
 	"Scripts": [
