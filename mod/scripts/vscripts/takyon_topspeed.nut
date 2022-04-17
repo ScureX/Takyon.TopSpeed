@@ -14,6 +14,7 @@ void function TopSpeedInit(){
 	AddCallback_OnReceivedSayTextMessage(TS_ChatCallback)
 
 	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
+	AddCallback_OnPlayerKilled(TS_OnPlayerKilled)
 	AddCallback_GameStateEnter(eGameState.Postmatch, TS_Postmatch)
 
 	thread TopSpeedMain()
@@ -258,6 +259,8 @@ void function TS_OnPlayerSpawned(entity player){
 		tmp.uid = player.GetUID()
 		ts_playerData.append(tmp)
 	}
+}
 
+void function TS_OnPlayerKilled(entity player){
 	TS_SaveConfig() // use this as periodic saving lol
 }
