@@ -261,6 +261,6 @@ void function TS_OnPlayerSpawned(entity player){
 	}
 }
 
-void function TS_OnPlayerKilled(entity player){
+void function TS_OnPlayerKilled(entity victim, entity attacker, var damageInfo){
 	TS_SaveConfig() // use this as periodic saving lol
 }
