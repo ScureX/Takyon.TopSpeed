@@ -35,6 +35,7 @@ void function TopSpeedMain(){
 						if(SpeedToKmh(sqrt(speed)) > GetConVarInt("ts_announce_min_speed") && !pd.aboveAnnounceSpeed){ // special announcement for being fast af
 							Chat_ServerBroadcast(format("\x1b[34m[TopSpeed] \x1b[38;2;220;220;20m%s is zooming! \x1b[0m(\x1b[38;2;0;220;30m%.2fkmh\x1b[0m/\x1b[38;2;0;220;30m%.2fmph\x1b[0m)", pd.name, SpeedToKmh(sqrt(speed)), SpeedToMph(sqrt(speed))))
 							pd.aboveAnnounceSpeed = true
+							TS_SaveConfig()
 							foreach(entity p in GetPlayerArray()){
 								try{
 									EmitSoundOnEntity(p, "HUD_Boost_Card_Earned_1P")
@@ -63,6 +64,20 @@ void function TS_LeaderBoard(entity player){
 	}
 }
 
+void function TS_RankSpeed(entity player){
+	TS_CfgInit() // load config
+
+	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players // sort config in new array to not fuck with other shit
+	ts_sortedConfig.sort(TopSpeedSort)
+
+	for(int i = 0; i < ts_sortedConfig.len(); i++){
+		if(ts_sortedConfig[i].uid == player.GetUID()){
+			Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(ts_sortedConfig[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(ts_sortedConfig[i].speed))) + "mph", false)
+			break
+		}
+	}
+}
+
 /*
  *	CHAT COMMANDS
  */
@@ -86,6 +101,9 @@ ClServer_MessageStruct function TS_ChatCallback(ClServer_MessageStruct message) 
         // command logic
 		if(cmd == "topspeed" || cmd == "ts"){
 			TS_LeaderBoard(message.player)
+		}
+		else if(cmd == "rankspeed"){
+			TS_RankSpeed(message.player)
 		}
     }
     return message
