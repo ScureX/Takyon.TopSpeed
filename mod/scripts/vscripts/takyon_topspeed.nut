@@ -5,10 +5,11 @@ global struct TS_PlayerData{
 	string name 
 	string uid
 	var speed = 0.0
-	bool aboveAnnounceSpeed = false
+	var aboveAnnounceSpeed = false
 }
 
 array<TS_PlayerData> ts_playerData = [] // data from current match
+array<TS_PlayerData> ts_postmatch_playerData = [] // data with this games top speeds to display at end of round
 
 void function TopSpeedInit(){
 	AddCallback_OnReceivedSayTextMessage(TS_ChatCallback)
@@ -17,7 +18,6 @@ void function TopSpeedInit(){
 
 	FlagInit("TS_ReceivedGetPlayer")
 	FlagInit("TS_SavedConfig")
-	FlagInit("TS_PDRefilled")
 
 	thread TopSpeedMain()
 }
@@ -26,11 +26,9 @@ void function TopSpeedMain(){
 	while(!IsLobby()){
 		wait 0.1
 
-		// since in postmatch we work with that array gotta make sure its filled
-		FlagClear("TS_PDRefilled")
 		// clear shit
 		ts_playerData = []
-		
+		// fill array
 		foreach(entity player in GetPlayerArray()){
 
 			TS_PlayerData data
@@ -42,28 +40,40 @@ void function TopSpeedMain(){
 			ts_playerData.append(data)
 		}
 
-		// since in postmatch we work with that array gotta make sure its filled
-		FlagSet("TS_PDRefilled")
-
 		try{
 			foreach(TS_PlayerData pd in ts_playerData){
 				float speed = GetPlayerSpeed(GetPlayerByUid(pd.uid))
+				bool shouldSaveData = false
 
-				// change top speed of player 
+				// change this rounds top speed of player
+				bool isSavedInPMList = false
+				foreach(TS_PlayerData pm_data in ts_postmatch_playerData){
+					if(pm_data.uid == pd.uid){
+						isSavedInPMList = true
+						if(pm_data.speed < speed)
+							pm_data.speed = speed
+						break
+					}
+				}
+
+				if(!isSavedInPMList){
+					TS_PlayerData pm_data
+					pm_data.uid = pd.uid
+					pm_data.speed = speed
+					ts_postmatch_playerData.append(pm_data)
+				}
+
+				// change overall top speed of player 
 				if(pd.speed < speed){
 					pd.speed = speed
-					TS_SaveConfig(pd, GetPlayerByUid(pd.uid)) // to minimize api requests and only send if better
-
-					FlagWait("TS_SavedConfig")
-					FlagClear("TS_SavedConfig")
+					shouldSaveData = true
 				}
-				
 
-				//TODO REWRITE THIS TO ONLY SEND ANNOUNCEMENT ONCE PERSON DROPS LIKE 50KMH AGAIN BELOW TS
 				// check if above announcement speed
 				if(SpeedToKmh(sqrt(speed)) > GetConVarInt("ts_announce_min_speed") && !pd.aboveAnnounceSpeed){ // special announcement for being fast af
 					Chat_ServerBroadcast(format("\x1b[34m[TopSpeed] \x1b[38;2;220;220;20m%s is zooming! \x1b[0m(\x1b[38;2;0;220;30m%.2fkmh\x1b[0m/\x1b[38;2;0;220;30m%.2fmph\x1b[0m)", pd.name, SpeedToKmh(sqrt(speed)), SpeedToMph(sqrt(speed))))
 					pd.aboveAnnounceSpeed = true
+					shouldSaveData = true
 					
 					foreach(entity p in GetPlayerArray()){
 						try{
@@ -73,10 +83,19 @@ void function TopSpeedMain(){
 				}
 				// reset aboveAnnounceSpeed bool
 				else if (SpeedToKmh(sqrt(speed)) < GetConVarInt("ts_announce_min_speed")) { 
-					pd.aboveAnnounceSpeed = false
+					print("below ann speed: " + pd.aboveAnnounceSpeed)
+					if(pd.aboveAnnounceSpeed){
+						pd.aboveAnnounceSpeed = false
+						shouldSaveData = true
+					}
 				}
-				
-				
+
+				// to minimize api requests and only send if better
+				if(shouldSaveData){
+					TS_SaveConfig(pd, GetPlayerByUid(pd.uid))
+					FlagWait("TS_SavedConfig")
+					FlagClear("TS_SavedConfig")
+				}
 			}
 		}catch(e){} // dont care lol
 	}
@@ -131,8 +150,7 @@ void function TS_RankSpeed(entity player){
 }
 
 void function TS_Postmatch(){
-	FlagWait("TS_PDRefilled")
-	array<TS_PlayerData> tempPD = ts_playerData
+	array<TS_PlayerData> tempPD = ts_postmatch_playerData
 	tempPD.sort(TopSpeedSort)
 
 	// avoid infinite loop
@@ -198,7 +216,6 @@ ClServer_MessageStruct function TS_ChatCallback(ClServer_MessageStruct message) 
  */
 
 void function TS_SaveConfig(TS_PlayerData player_data, entity player){
-
 	// send post request to update
 	HttpRequest request;
 	request.method = HttpRequestMethod.POST;
@@ -278,6 +295,7 @@ void function GetPlayer(entity player, TS_PlayerData tmp){
 		tmp.name = player.GetPlayerName() // maybe they changed their name? idk just gonna do it like this
 		tmp.uid = player.GetUID()
 		tmp.speed = json.rawget("speed").tofloat()
+		tmp.aboveAnnounceSpeed = json.rawget("aboveAnnounceSpeed").tostring() == "true" ? true : false
 		FlagSet("TS_ReceivedGetPlayer")
 	}
 
@@ -294,7 +312,8 @@ string function PlayerDataToJson(entity player, TS_PlayerData player_data){
 	tab_inner[ "mod" ] <- "topspeed"
 	tab_inner[ "uid" ] <- player.GetUID()
 	tab_inner[ "name" ] <- player.GetPlayerName()
-	tab_inner[ "speed"] <- player_data.speed
+	tab_inner[ "speed" ] <- player_data.speed
+	tab_inner[ "aboveAnnounceSpeed" ] <- player_data.aboveAnnounceSpeed
 
 	var mods = []
 	mods.append(tab_inner)
