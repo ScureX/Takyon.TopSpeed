@@ -1,21 +1,23 @@
+untyped
 global function TopSpeedInit
 
 global struct TS_PlayerData{
 	string name 
 	string uid
-	float speed = 0
+	var speed = 0.0
 	bool aboveAnnounceSpeed = false
 }
 
-string path = "../R2Northstar/mods/Takyon.TopSpeed/mod/scripts/vscripts/takyon_topspeed_cfg.nut" // where the config is stored
 array<TS_PlayerData> ts_playerData = [] // data from current match
 
 void function TopSpeedInit(){
 	AddCallback_OnReceivedSayTextMessage(TS_ChatCallback)
 
-	AddCallback_OnPlayerRespawned(TS_OnPlayerSpawned)
-	AddCallback_OnPlayerKilled(TS_OnPlayerKilled)
 	AddCallback_GameStateEnter(eGameState.Postmatch, TS_Postmatch)
+
+	FlagInit("TS_ReceivedGetPlayer")
+	FlagInit("TS_SavedConfig")
+	FlagInit("TS_PDRefilled")
 
 	thread TopSpeedMain()
 }
@@ -23,60 +25,141 @@ void function TopSpeedInit(){
 void function TopSpeedMain(){
 	while(!IsLobby()){
 		wait 0.1
+
+		// since in postmatch we work with that array gotta make sure its filled
+		FlagClear("TS_PDRefilled")
+		// clear shit
+		ts_playerData = []
 		
 		foreach(entity player in GetPlayerArray()){
-			foreach(TS_PlayerData pd in ts_playerData){
-				try{
-					if(player.GetPlayerName() == pd.name){
-						float speed = GetPlayerSpeed(player)
 
-						if(speed > pd.speed)
-							pd.speed = speed
-						
-						if(SpeedToKmh(sqrt(speed)) > GetConVarInt("ts_announce_min_speed") && !pd.aboveAnnounceSpeed){ // special announcement for being fast af
-							Chat_ServerBroadcast(format("\x1b[34m[TopSpeed] \x1b[38;2;220;220;20m%s is zooming! \x1b[0m(\x1b[38;2;0;220;30m%.2fkmh\x1b[0m/\x1b[38;2;0;220;30m%.2fmph\x1b[0m)", pd.name, SpeedToKmh(sqrt(speed)), SpeedToMph(sqrt(speed))))
-							pd.aboveAnnounceSpeed = true
-							TS_SaveConfig()
-							foreach(entity p in GetPlayerArray()){
-								try{
-									EmitSoundOnEntity(p, "HUD_Boost_Card_Earned_1P")
-								} catch(e){} // dont care lol
-							}
-						}
-						else if (SpeedToKmh(sqrt(speed)) < GetConVarInt("ts_announce_min_speed")) pd.aboveAnnounceSpeed = false
-					}
-				} catch(e){print(e)}
-			}
+			TS_PlayerData data
+			GetPlayer(player, data)
+
+			FlagWait("TS_ReceivedGetPlayer")
+			FlagClear("TS_ReceivedGetPlayer")
+
+			ts_playerData.append(data)
 		}
+
+		// since in postmatch we work with that array gotta make sure its filled
+		FlagSet("TS_PDRefilled")
+
+		try{
+			foreach(TS_PlayerData pd in ts_playerData){
+				float speed = GetPlayerSpeed(GetPlayerByUid(pd.uid))
+
+				// change top speed of player 
+				if(pd.speed < speed){
+					pd.speed = speed
+					TS_SaveConfig(pd, GetPlayerByUid(pd.uid)) // to minimize api requests and only send if better
+
+					FlagWait("TS_SavedConfig")
+					FlagClear("TS_SavedConfig")
+				}
+				
+
+				//TODO REWRITE THIS TO ONLY SEND ANNOUNCEMENT ONCE PERSON DROPS LIKE 50KMH AGAIN BELOW TS
+				// check if above announcement speed
+				if(SpeedToKmh(sqrt(speed)) > GetConVarInt("ts_announce_min_speed") && !pd.aboveAnnounceSpeed){ // special announcement for being fast af
+					Chat_ServerBroadcast(format("\x1b[34m[TopSpeed] \x1b[38;2;220;220;20m%s is zooming! \x1b[0m(\x1b[38;2;0;220;30m%.2fkmh\x1b[0m/\x1b[38;2;0;220;30m%.2fmph\x1b[0m)", pd.name, SpeedToKmh(sqrt(speed)), SpeedToMph(sqrt(speed))))
+					pd.aboveAnnounceSpeed = true
+					
+					foreach(entity p in GetPlayerArray()){
+						try{
+							EmitSoundOnEntity(p, "HUD_Boost_Card_Earned_1P")
+						} catch(e){} // dont care lol
+					}
+				}
+				// reset aboveAnnounceSpeed bool
+				else if (SpeedToKmh(sqrt(speed)) < GetConVarInt("ts_announce_min_speed")) { 
+					pd.aboveAnnounceSpeed = false
+				}
+				
+				
+			}
+		}catch(e){} // dont care lol
 	}
 }
 
 void function TS_LeaderBoard(entity player){
-	TS_CfgInit() // load config
+	HttpRequest request;
+	request.method = HttpRequestMethod.GET;
+	request.url = "http://localhost:8080";
+	request.headers["t_querytype"] <- ["topspeed_leaderboard"];
 
-	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players // sort config in new array to not fuck with other shit
-	ts_sortedConfig.sort(TopSpeedSort)
-	Chat_ServerPrivateMessage(player, "\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mTop Leaderboard", false)
+	entity player = player
 
-	int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount") > ts_sortedConfig.len() ? ts_sortedConfig.len() : GetConVarInt("ts_cfg_leaderboard_amount")
+	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
+	{
+		array<string> lines = split(response.body, "\n")
 
-	for(int i = 0; i < loopAmount; i++){
-		Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(ts_sortedConfig[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(ts_sortedConfig[i].speed))) + "mph", false)
+		int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount")
+		
+		for(int i = 0; i < (loopAmount > lines.len() ? lines.len() : loopAmount); i++)
+			Chat_ServerPrivateMessage(player, lines[i], false, false)
 	}
+
+	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
+	{
+		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+	}
+
+	NSHttpRequest( request, onSuccess, onFailure );
 }
 
 void function TS_RankSpeed(entity player){
-	TS_CfgInit() // load config
+	HttpRequest request;
+	request.method = HttpRequestMethod.GET;
+	request.url = "http://localhost:8080";
+	request.headers["t_querytype"] <- ["topspeed_queryplayer"];
+	request.headers["t_uid"] <- [player.GetUID().tostring()];
 
-	array<TS_PlayerData> ts_sortedConfig = ts_cfg_players // sort config in new array to not fuck with other shit
-	ts_sortedConfig.sort(TopSpeedSort)
+	entity player = player
 
-	for(int i = 0; i < ts_sortedConfig.len(); i++){
-		if(ts_sortedConfig[i].uid == player.GetUID()){
-			Chat_ServerPrivateMessage(player, "[" + (i+1) + "] " + ts_sortedConfig[i].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(ts_sortedConfig[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(ts_sortedConfig[i].speed))) + "mph", false)
-			break
+	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
+	{
+		Chat_ServerPrivateMessage(player, response.body, false, false)
+	}
+
+	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
+	{
+		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+	}
+
+	NSHttpRequest( request, onSuccess, onFailure );
+}
+
+void function TS_Postmatch(){
+	FlagWait("TS_PDRefilled")
+	array<TS_PlayerData> tempPD = ts_playerData
+	tempPD.sort(TopSpeedSort)
+
+	// avoid infinite loop
+	int rankAmount
+	if(tempPD.len() < GetConVarInt("ts_rank_amount")) rankAmount = tempPD.len()
+	else rankAmount = GetConVarInt("ts_rank_amount")
+
+	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mMatch-Leaderboard")
+	for(int i = 0; i < rankAmount; i++){
+		switch(i){
+			case 0:
+				Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[0].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[0].speed))) + "mph")
+				break
+			case 1:
+				Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[1].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[1].speed))) + "mph")
+				break
+			case 2:
+				Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[2].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[2].speed))) + "mph")
+				break
+			default:
+				Chat_ServerBroadcast(tempPD[i].name +": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[i].speed)) + "mph"))
+				break
 		}
 	}
+
+	Chat_ServerBroadcast("")
+	print("[TS] Leaderboard sent")
 }
 
 /*
@@ -114,71 +197,28 @@ ClServer_MessageStruct function TS_ChatCallback(ClServer_MessageStruct message) 
  *	CONFIG
  */
 
-const string TS_HEADER = "global function TS_CfgInit\n" +
-						 "global array<TS_PlayerData> ts_cfg_players = []\n\n" +
-						 "void function TS_CfgInit(){\n" +
-						 "ts_cfg_players.clear()\n"
+void function TS_SaveConfig(TS_PlayerData player_data, entity player){
 
-const string TS_FOOTER = "}\n\n" +
-						 "void function AddPlayer(string name, string uid, float speed){\n" +
-						 "TS_PlayerData tmp\ntmp.name = name\ntmp.uid = uid\ntmp.speed = speed\nts_cfg_players.append(tmp)\n" +
-						 "}"
+	// send post request to update
+	HttpRequest request;
+	request.method = HttpRequestMethod.POST;
+	request.url = "http://localhost:8080";
+	request.headers["t_uid"] <- [player.GetUID().tostring()];
+	request.contentType = "application/json; charset=utf-8"
+	request.body =  PlayerDataToJson(player, player_data)
 
-void function TS_SaveConfig(){
-	TS_CfgInit()
-
-	array<TS_PlayerData> livePlayersToSave = []
-	array<TS_PlayerData> offlinePlayersToSave = []
-
-	foreach(TS_PlayerData pd in ts_playerData){ // loop through each player in current match, save all players with higher times or not in cfg
-		bool found = false
-		foreach(TS_PlayerData pdcfg in ts_cfg_players){
-			if(pd.uid == pdcfg.uid){ // player is in cfg and faster -> should save
-				found = true
-				if(pdcfg.speed < pd.speed)
-					livePlayersToSave.append(pd)
-			}
-		}
-
-		if(!found){ // not in cfg -> save
-			livePlayersToSave.append(pd)
-		}
+	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
+	{
+		FlagSet("TS_SavedConfig")
 	}
 
-	// loop through cfg to save players not online
-	foreach(TS_PlayerData pdcfg in ts_cfg_players){ // loop through everyone in config
-		bool found = false
-		foreach(TS_PlayerData pd in livePlayersToSave){ // loop through each player that should be saved. if pdcfg cant be found there player is offline. save pdcfg
-			if(pd.uid == pdcfg.uid)
-				found = true // player is aleady in livePLayerToSave, dont save their cfg
-		}
-
-		if(!found){ // player not in livePlayersToSave -> is offline, save cfg
-			offlinePlayersToSave.append(pdcfg)
-		}
+	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
+	{
+		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+		FlagSet("TS_SavedConfig")
 	}
 
-	// merge live and offline players
-	array<TS_PlayerData> allPlayersToSave = []
-	allPlayersToSave.extend(livePlayersToSave)
-	allPlayersToSave.extend(offlinePlayersToSave)
-
-	// write to buffer
-	DevTextBufferClear()
-	DevTextBufferWrite(TS_HEADER)
-
-	foreach(TS_PlayerData pd in allPlayersToSave){
-		DevTextBufferWrite(format("AddPlayer(\"%s\", \"%s\", %f)\n", pd.name, pd.uid, pd.speed))
-	}
-
-    DevTextBufferWrite(TS_FOOTER)
-
-    DevP4Checkout(path)
-	DevTextBufferDumpToFile(path)
-	DevP4Add(path)
-
-	print("[TopSpeed] Saved config at " + path)
-	//Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;75;245;66mSpeeds have been saved and will be updated on map-reload")
+	NSHttpRequest( request, onSuccess, onFailure );
 }
 
 /*
@@ -205,62 +245,68 @@ float function SpeedToMph(float vel){
 	return (vel * (0.274176/3)) * (0.621371)
 }
 
-void function TS_Postmatch(){
-	array<TS_PlayerData> tempPD = ts_playerData
-	tempPD.sort(SpeedSort)
+entity function GetPlayerByUid(string uid){
+	foreach(entity player in GetPlayerArray()){
+		if(player.GetUID() == uid)
+			return player
+	}
+	return null // should maybe perhaps never reach
+}
 
-	// avoid infinite loop
-	int rankAmount
-	if(tempPD.len() < GetConVarInt("ts_rank_amount")) rankAmount = tempPD.len()
-	else rankAmount = GetConVarInt("ts_rank_amount")
+void function GetPlayer(entity player, TS_PlayerData tmp){
+	HttpRequest request;
+	request.method = HttpRequestMethod.GET;
+	request.url = "http://localhost:8080";
+	request.headers["t_querytype"] <- ["topspeed_queryplayer"];
+	request.headers["t_returnraw"] <- ["true"];
+	request.headers["t_uid"] <- [player.GetUID().tostring()];
 
-	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mMatch-Leaderboard")
-	for(int i = 0; i < rankAmount; i++){
-		switch(i){
-			case 0:
-				Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[0].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[0].speed))) + "mph")
-				break
-			case 1:
-				Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[1].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[1].speed))) + "mph")
-				break
-			case 2:
-				Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[2].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[2].speed))) + "mph")
-				break
-			default:
-				Chat_ServerBroadcast(tempPD[i].name +": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[i].speed)) + "mph"))
-				break
+	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player, tmp )
+	{
+		// failed to get player
+		if(!NSIsSuccessHttpCode(response.statusCode)){
+			print("uninitialized player, setting up default for " + player.GetPlayerName())
+			tmp.name = player.GetPlayerName() 
+			tmp.uid = player.GetUID()
+			FlagSet("TS_ReceivedGetPlayer")
+			return
 		}
-	}
+			
+		// got player successfully
+		table json = DecodeJSON(response.body)
 
-	Chat_ServerBroadcast("")
-	print("[TS] Leaderboard sent")
-	TS_SaveConfig()
-}
-
-int function SpeedSort(TS_PlayerData data1, TS_PlayerData data2){
-  if ( data1.speed == data2.speed )
-    return 0
-  return data1.speed < data2.speed ? 1 : -1
-}
-
-void function TS_OnPlayerSpawned(entity player){
-	bool found = false
-	foreach(TS_PlayerData pd in ts_playerData){
-		try{
-			if(player.GetPlayerName() == pd.name){
-				found = true
-			}
-		} catch(e){}
-	}
-
-	if(!found){
-		TS_PlayerData tmp
-		tmp.name = player.GetPlayerName()
+		tmp.name = player.GetPlayerName() // maybe they changed their name? idk just gonna do it like this
 		tmp.uid = player.GetUID()
-		ts_playerData.append(tmp)
+		tmp.speed = json.rawget("speed").tofloat()
+		FlagSet("TS_ReceivedGetPlayer")
 	}
+
+	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
+	{
+		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+	}
+	
+	NSHttpRequest( request, onSuccess, onFailure )
 }
 
-void function TS_OnPlayerKilled(entity victim, entity attacker, var damageInfo){
-	TS_SaveConfig() // use this as periodic saving lol
+string function PlayerDataToJson(entity player, TS_PlayerData player_data){
+	table tab_inner = {}
+	tab_inner[ "mod" ] <- "topspeed"
+	tab_inner[ "uid" ] <- player.GetUID()
+	tab_inner[ "name" ] <- player.GetPlayerName()
+	tab_inner[ "speed"] <- player_data.speed
+
+	var mods = []
+	mods.append(tab_inner)
+
+	table tab_mods = {}
+	tab_mods[ "mods" ] <- mods
+
+	var players = []
+	players.append(tab_mods)
+
+	table tab_players = {}
+	tab_players[ "players" ] <- players
+
+	return EncodeJSON(tab_players)
 }

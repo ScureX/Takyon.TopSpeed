@@ -3,7 +3,10 @@ global array<TS_PlayerData> ts_cfg_players = []
 
 void function TS_CfgInit(){
 ts_cfg_players.clear()
-AddPlayer("Takyon_Scure", "1006880507304", 7527508.000000)
+AddPlayer("Takyon_Scure", "1006792030176", 7407.673340)
+AddPlayer("iSimpForOkayu", "2846622119", 1188785.625000)
+AddPlayer("balls", "1005729651973", 1621892.875000)
+AddPlayer("Takyon_Scure", "1006880507304", 59963404.000000)
 AddPlayer("darthelmo10", "1009099551543", 530541.000000)
 AddPlayer("D16hvv", "1011732926770", 53891.750000)
 AddPlayer("ppaulki34", "1003790209029", 49218.406250)

@@ -15,7 +15,7 @@
 		},
 		{
 			"Name": "ts_announce_min_speed",
-			"DefaultValue": "50" // how fast a player has to go to get the anouncement that theyre goin fast. set this HIGH but not unreachable
+			"DefaultValue": "225" // how fast a player has to go to get the anouncement that theyre goin fast. set this HIGH but not unreachable
 		}
 	],
 	"Scripts": [
@@ -27,7 +27,7 @@
 			}
 		},
 		{
-			"Path": "takyon_topspeed_cfg.nut",
+			"Path": "takyon_topspeed_constants.nut",
 			"RunOn": "SERVER"
 		}
 	]
