@@ -25,10 +25,6 @@
 			"ServerCallback": {
 				"After": "TopSpeedInit"
 			}
-		},
-		{
-			"Path": "takyon_topspeed_constants.nut",
-			"RunOn": "SERVER"
 		}
 	]
 }

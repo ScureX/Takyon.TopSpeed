@@ -58,6 +58,7 @@ void function TopSpeedMain(){
 
 				if(!isSavedInPMList){
 					TS_PlayerData pm_data
+					pm_data.name = pd.name
 					pm_data.uid = pd.uid
 					pm_data.speed = speed
 					ts_postmatch_playerData.append(pm_data)
@@ -83,7 +84,6 @@ void function TopSpeedMain(){
 				}
 				// reset aboveAnnounceSpeed bool
 				else if (SpeedToKmh(sqrt(speed)) < GetConVarInt("ts_announce_min_speed")) { 
-					print("below ann speed: " + pd.aboveAnnounceSpeed)
 					if(pd.aboveAnnounceSpeed){
 						pd.aboveAnnounceSpeed = false
 						shouldSaveData = true
