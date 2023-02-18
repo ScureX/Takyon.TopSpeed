@@ -97,7 +97,7 @@ void function TopSpeedMain(){
 					FlagClear("TS_SavedConfig")
 				}
 			}
-		}catch(e){} // dont care lol
+		}catch(e){print("[topspeed] [error] [main loop] " + e)} 
 	}
 }
 
@@ -150,34 +150,37 @@ void function TS_RankSpeed(entity player){
 }
 
 void function TS_Postmatch(){
-	array<TS_PlayerData> tempPD = ts_postmatch_playerData
-	tempPD.sort(TopSpeedSort)
+	print("[topspeed] [TS_Postmatch]")
+	try{
+		array<TS_PlayerData> tempPD = ts_postmatch_playerData
+		tempPD.sort(TopSpeedSort)
 
-	// avoid infinite loop
-	int rankAmount
-	if(tempPD.len() < GetConVarInt("ts_rank_amount")) rankAmount = tempPD.len()
-	else rankAmount = GetConVarInt("ts_rank_amount")
+		// avoid infinite loop
+		int rankAmount
+		if(tempPD.len() < GetConVarInt("ts_rank_amount")) rankAmount = tempPD.len()
+		else rankAmount = GetConVarInt("ts_rank_amount")
 
-	Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mMatch-Leaderboard")
-	for(int i = 0; i < rankAmount; i++){
-		switch(i){
-			case 0:
-				Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[0].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[0].speed))) + "mph")
-				break
-			case 1:
-				Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[1].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[1].speed))) + "mph")
-				break
-			case 2:
-				Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[2].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[2].speed))) + "mph")
-				break
-			default:
-				Chat_ServerBroadcast(tempPD[i].name +": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[i].speed)) + "mph"))
-				break
+		Chat_ServerBroadcast("\x1b[34m[TopSpeed] \x1b[38;2;0;220;30mMatch-Leaderboard")
+		for(int i = 0; i < rankAmount; i++){
+			switch(i){
+				case 0:
+					Chat_ServerBroadcast("\x1b[38;2;254;214;0m" + tempPD[0].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[0].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[0].speed))) + "mph")
+					break
+				case 1:
+					Chat_ServerBroadcast("\x1b[38;2;210;210;210m" + tempPD[1].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[1].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[1].speed))) + "mph")
+					break
+				case 2:
+					Chat_ServerBroadcast("\x1b[38;2;204;126;49m" + tempPD[2].name + ": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[2].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[2].speed))) + "mph")
+					break
+				default:
+					Chat_ServerBroadcast(tempPD[i].name +": \x1b[38;2;75;245;66m" + format("%.2f", SpeedToKmh(sqrt(tempPD[i].speed))) + "kmh\x1b[0m/\x1b[38;2;75;245;66m" + format("%.2f", SpeedToMph(sqrt(tempPD[i].speed)) + "mph"))
+					break
+			}
 		}
-	}
 
-	Chat_ServerBroadcast("")
-	print("[TS] Leaderboard sent")
+		Chat_ServerBroadcast("")
+		print("[TS] Leaderboard sent")
+	} catch(e){print("[topspeed] [error] [TS_Postmatch] " + e)}
 }
 
 /*
@@ -216,26 +219,29 @@ ClServer_MessageStruct function TS_ChatCallback(ClServer_MessageStruct message) 
  */
 
 void function TS_SaveConfig(TS_PlayerData player_data, entity player){
-	// send post request to update
-	HttpRequest request;
-	request.method = HttpRequestMethod.POST;
-	request.url = "http://localhost:8080";
-	request.headers["t_uid"] <- [player.GetUID().tostring()];
-	request.contentType = "application/json; charset=utf-8"
-	request.body =  PlayerDataToJson(player, player_data)
+	print("[topspeed] [TS_SaveConfig]")
+	try{
+		// send post request to update
+		HttpRequest request;
+		request.method = HttpRequestMethod.POST;
+		request.url = "http://localhost:8080";
+		request.headers["t_uid"] <- [player.GetUID().tostring()];
+		request.contentType = "application/json; charset=utf-8"
+		request.body =  PlayerDataToJson(player, player_data)
 
-	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
-	{
-		FlagSet("TS_SavedConfig")
-	}
+		void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
+		{
+			FlagSet("TS_SavedConfig")
+		}
 
-	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
-	{
-		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
-		FlagSet("TS_SavedConfig")
-	}
+		void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
+		{
+			Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+			FlagSet("TS_SavedConfig")
+		}
 
-	NSHttpRequest( request, onSuccess, onFailure );
+		NSHttpRequest( request, onSuccess, onFailure );
+	} catch(e){print("[topspeed] [error] [TS_SaveConfig] " + e)}
 }
 
 /*
@@ -271,6 +277,7 @@ entity function GetPlayerByUid(string uid){
 }
 
 void function GetPlayer(entity player, TS_PlayerData tmp){
+	print("[topspeed] [GetPlayer]")
 	HttpRequest request;
 	request.method = HttpRequestMethod.GET;
 	request.url = "http://localhost:8080";
@@ -308,6 +315,7 @@ void function GetPlayer(entity player, TS_PlayerData tmp){
 }
 
 string function PlayerDataToJson(entity player, TS_PlayerData player_data){
+	print("[topspeed] [PlayerDataToJson]")
 	table tab_inner = {}
 	tab_inner[ "mod" ] <- "topspeed"
 	tab_inner[ "uid" ] <- player.GetUID()
