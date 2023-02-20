@@ -1,0 +1,1 @@
+global const string TS_SERVER_ERROR = "\x1b[34m[TopSpeed] \x1b[38;2;220;20;20mERROR: Server did not respond."

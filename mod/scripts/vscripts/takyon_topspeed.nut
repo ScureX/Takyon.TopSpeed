@@ -30,7 +30,9 @@ void function TopSpeedMain(){
 		ts_playerData = []
 		// fill array
 		foreach(entity player in GetPlayerArray()){
-
+			if(!IsValid(player))
+				continue
+			
 			TS_PlayerData data
 			GetPlayer(player, data)
 
@@ -107,10 +109,10 @@ void function TS_LeaderBoard(entity player){
 	request.url = "http://localhost:8080";
 	request.headers["t_querytype"] <- ["topspeed_leaderboard"];
 
-	entity player = player
-
 	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
 	{
+		if(!IsValid(player))
+			return
 		array<string> lines = split(response.body, "\n")
 
 		int loopAmount = GetConVarInt("ts_cfg_leaderboard_amount")
@@ -121,7 +123,9 @@ void function TS_LeaderBoard(entity player){
 
 	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
 	{
-		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+		if(!IsValid(player))
+			return
+		Chat_ServerPrivateMessage(player, TS_SERVER_ERROR, false, false)
 	}
 
 	NSHttpRequest( request, onSuccess, onFailure );
@@ -143,7 +147,7 @@ void function TS_RankSpeed(entity player){
 
 	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
 	{
-		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+		Chat_ServerPrivateMessage(player, TS_SERVER_ERROR, false, false)
 	}
 
 	NSHttpRequest( request, onSuccess, onFailure );
@@ -229,15 +233,17 @@ void function TS_SaveConfig(TS_PlayerData player_data, entity player){
 		request.contentType = "application/json; charset=utf-8"
 		request.body =  PlayerDataToJson(player, player_data)
 
-		void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
+		void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response )
 		{
 			FlagSet("TS_SavedConfig")
 		}
 
 		void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
 		{
-			Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
 			FlagSet("TS_SavedConfig")
+			if(!IsValid(player))
+				return
+			Chat_ServerPrivateMessage(player, TS_SERVER_ERROR, false, false)
 		}
 
 		NSHttpRequest( request, onSuccess, onFailure );
@@ -277,7 +283,6 @@ entity function GetPlayerByUid(string uid){
 }
 
 void function GetPlayer(entity player, TS_PlayerData tmp){
-	print("[topspeed] [GetPlayer]")
 	HttpRequest request;
 	request.method = HttpRequestMethod.GET;
 	request.url = "http://localhost:8080";
@@ -308,7 +313,9 @@ void function GetPlayer(entity player, TS_PlayerData tmp){
 
 	void functionref( HttpRequestFailure ) onFailure = void function ( HttpRequestFailure failure ) : ( player )
 	{
-		Chat_ServerPrivateMessage(player, RM_SERVER_ERROR, false, false)
+		if(!IsValid(player))
+			return
+		Chat_ServerPrivateMessage(player, TS_SERVER_ERROR, false, false)
 	}
 	
 	NSHttpRequest( request, onSuccess, onFailure )

@@ -20,6 +20,10 @@
 	],
 	"Scripts": [
 		{
+			"Path": "takyon_topspeed_constants.nut",
+			"RunOn": "SERVER"
+		},
+		{
 			"Path": "takyon_topspeed.nut",
 			"RunOn": "SERVER",
 			"ServerCallback": {
