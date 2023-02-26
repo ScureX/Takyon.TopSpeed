@@ -106,7 +106,7 @@ void function TopSpeedMain(){
 void function TS_LeaderBoard(entity player){
 	HttpRequest request;
 	request.method = HttpRequestMethod.GET;
-	request.url = "http://localhost:8080";
+	request.url = "http://localhost:8880";
 	request.headers["t_querytype"] <- ["topspeed_leaderboard"];
 
 	void functionref( HttpRequestResponse ) onSuccess = void function ( HttpRequestResponse response ) : ( player )
@@ -134,7 +134,7 @@ void function TS_LeaderBoard(entity player){
 void function TS_RankSpeed(entity player){
 	HttpRequest request;
 	request.method = HttpRequestMethod.GET;
-	request.url = "http://localhost:8080";
+	request.url = "http://localhost:8880";
 	request.headers["t_querytype"] <- ["topspeed_queryplayer"];
 	request.headers["t_uid"] <- [player.GetUID().tostring()];
 
@@ -228,7 +228,7 @@ void function TS_SaveConfig(TS_PlayerData player_data, entity player){
 		// send post request to update
 		HttpRequest request;
 		request.method = HttpRequestMethod.POST;
-		request.url = "http://localhost:8080";
+		request.url = "http://localhost:8880";
 		request.headers["t_uid"] <- [player.GetUID().tostring()];
 		request.contentType = "application/json; charset=utf-8"
 		request.body =  PlayerDataToJson(player, player_data)
@@ -285,7 +285,7 @@ entity function GetPlayerByUid(string uid){
 void function GetPlayer(entity player, TS_PlayerData tmp){
 	HttpRequest request;
 	request.method = HttpRequestMethod.GET;
-	request.url = "http://localhost:8080";
+	request.url = "http://localhost:8880";
 	request.headers["t_querytype"] <- ["topspeed_queryplayer"];
 	request.headers["t_returnraw"] <- ["true"];
 	request.headers["t_uid"] <- [player.GetUID().tostring()];
